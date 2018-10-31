@@ -1,0 +1,271 @@
+<?xml version="1.0"?>
+<project default="buildAll" basedir=".">
+
+    <path id="pcp">
+      <pathelement path="${classpath}" />
+      <fileset dir="lib">
+        <include name="**/*.jar" />
+      </fileset>
+      <pathelement location="classes" />
+      <pathelement location="${classpath}"/>
+    </path>
+	
+    <path id="pcpt">
+      <pathelement path="${classpath}" />
+      <fileset dir="lib">
+        <include name="**/*.jar" />
+      </fileset>
+        <fileset dir="build">
+          <include name="**/*.jar" />
+        </fileset>
+      <pathelement location="classes" />
+      <pathelement location="${classpath}"/>
+    </path>
+
+    
+ <target name="init">
+    <property name="name" value="ms_module_examples"/>
+    <property name="optimize" value="true" />
+ 	<property name="java_version" value="1.8" />
+
+    <echo message="Building ${name}" />
+
+    <property name="mode" value="debug" />
+    <echo message="Building ${name} - mode:${mode}" />
+
+    <property name="debug" value="true"/>
+    <property name="src.dir" value="./src/main"/>
+    <property name="src.xar" value="./src/xar"/>
+    <property name="docs.dir" value="./docs"/>
+    <property name="lib.dir" value="./lib"/>
+    <property name="test.src" value="./src/test"/>
+    <property name="test.dest" value="./build/test"/>
+    <property name="test.report" value="./build/test/report"/>
+
+    <property name="build.dir" value="./build"/>
+    <property name="build.src" value="./build/src"/>
+    <property name="build.dest" value="./build/classes"/>
+    <property name="build.docs" value="./apidoc"/>
+ 	
+    <propertyfile comment="Build Information" file="build.number" />
+
+ </target>
+
+  <!-- =================================================================== -->
+  <!-- Prepares the build directory                                        -->
+  <!-- =================================================================== -->
+  <target name="prepare" depends="init">
+    <!-- create directories -->
+    <echo message="Preparing the build directories"/>
+    <mkdir dir="${build.dir}"/>
+    <mkdir dir="${build.src}"/>
+    <mkdir dir="${test.dest}"/>
+    <mkdir dir="${test.report}"/>
+  </target>
+	
+    <available file=".git" type="dir" property="git.present"/>
+
+    <target name="git.revision" description="Store git revision in ${repository.version}" if="git.present">
+        <exec executable="git" outputproperty="git.revision" failifexecutionfails="false" errorproperty="">
+            <arg value="describe"/>
+            <arg value="--tags"/>
+            <arg value="--always"/>
+            <arg value="HEAD"/>
+        </exec>
+        <condition property="repository.version" value="${git.revision}" else="unknown">
+            <and>
+                <isset property="git.revision"/>
+                <length string="${git.revision}" trim="yes" length="0" when="greater"/>
+            </and>
+        </condition>
+    </target>   
+    
+    
+  <target name="buildNumber"  >
+    <propertyfile comment="Build Information"
+                  file="build.number">
+    <!-- 2007-12-11T10:53:12+11:00 -->
+        <entry key="build.date"
+               type="date"
+               pattern="yyyy-MM-dd'T'HH:mm:ss"
+               value="now"/>
+    </propertyfile>
+    <buildnumber file="build.number"/>
+  </target> 
+
+
+  <!-- =================================================================== -->
+  <!-- Prepares the source code                                            -->
+  <!-- =================================================================== -->
+  <target name="prepare-src" depends="prepare,git.revision">
+    <!-- copy src files -->
+    <copy todir="${build.src}"  >
+     <fileset dir="${src.dir}"
+     	includes="**/*.java"/>
+    </copy>	
+    <copy todir="${build.dest}">
+     <fileset dir="${src.dir}"
+     	includes="**/*.gif,**/*.xsl,**/*.db"/>
+    </copy>	
+    <copy todir="${build.dest}">
+     <fileset dir="${src.dir}"
+     	includes="**/*.jpg, **/*.xml,**/*.txt"/>
+    </copy>	
+  	
+    <copy todir="${test.dest}">
+     <fileset dir="${test.src}"
+        includes="**/*.json, **/*.xml, **/*.csv, **/*.xsl"/>
+    </copy> 
+    <loadproperties srcFile="build.number"/>
+    <replace file="${build.src}/org/xmlpipe/ms/api/examples/Constants.java" token="@buildNumber@" value="${build.number}" />
+    <replace file="${build.src}/org/xmlpipe/ms/api/examples/Constants.java" token="@buildDate@" value="${build.date}" />
+    <replace file="${build.src}/org/xmlpipe/ms/api/examples/Constants.java" token="@revision@" value="${git.revision}" />
+  	
+  </target>
+
+
+  <!-- =================================================================== -->
+  <!-- Compiles the source directory                                       -->
+  <!-- =================================================================== -->
+  <target name="compile" depends="prepare-src">
+    <echo message="Compiling the sources "/>
+    <!-- create directories -->
+    <mkdir dir="${build.dest}"/>
+
+
+    <javac srcdir="${build.src}"
+           destdir="${build.dest}"
+           debug="${debug}"
+    	encoding="UTF8"
+        source="${java_version}"
+        target="${java_version}"
+    	   includeantruntime="false"
+           deprecation="${deprecation}"
+           optimize="${optimize}"
+           excludes="**/${ignore_this}"
+	   classpathref="pcp"
+	verbose="no"
+	   >
+	</javac>	   
+  </target>
+  
+ 
+
+  <!-- =================================================================== -->
+  <!-- Creates the class package                                           -->
+  <!-- =================================================================== -->
+  <target name="package" depends="compile">
+    <echo message="Creating the jar file ${build.dir}/${name}.jar"/>
+    <jar jarfile="${build.dir}/${name}.jar"
+         basedir="${build.dest}"
+        manifest="${src.dir}/package.mf" 
+         includes="**/*"/>
+  </target>
+
+
+   <target name="buildAll" depends="package,packageTest" />
+	
+
+  <target name="all" depends="package,test" >
+  </target>
+	
+	
+	<target name="testCompile" depends="package">
+    <javac srcdir="${test.src}"
+           destdir="${test.dest}"
+           debug="${debug}"
+        encoding="UTF8"
+        source="${java_version}"
+        target="${java_version}"
+        includeantruntime="false"
+           deprecation="true"
+           optimize="${optimize}"
+           excludes="**/${ignore_this}"
+	   classpathref="pcpt"
+	   verbose="no"
+	   >
+	</javac>	   
+  </target>
+	
+
+	
+	  <target name="packageTest" depends="testCompile">
+	    <echo message="Creating the jar file ${build.dir}/test${name}.jar"/>
+	    <jar jarfile="${build.dir}/test_${name}.jar"
+	         basedir="${test.dest}"
+	         includes="**/*"/>
+	  </target>
+	
+
+	
+	<target name="test" depends="packageTest">
+		<junit printsummary="yes" haltonfailure="no" fork="true" maxmemory="1024m" >
+		  <classpath>
+		      <fileset dir="lib">
+		        <include name="**/*.jar" />
+		      </fileset>
+		        <fileset dir="build">
+		          <include name="**/*.jar" />
+		        </fileset>
+		  </classpath>
+
+		  <formatter type="xml"/>
+			
+
+		  <batchtest fork="yes" todir="${test.report}">
+		    <fileset dir="${test.src}">
+		      <include name="**/*Test.java"/>
+			  <include name="**/Test*.java"/>
+		    </fileset>
+		  </batchtest>
+		</junit>
+		
+		<junitreport todir="${test.report}">
+		    <fileset dir="${test.report}">
+		      <include name="TEST-*.xml" />
+		    </fileset>
+		    <report todir="${test.report}" />
+		  </junitreport>		
+		
+	</target>
+	
+	  <target name="jenkins" depends="clean,all" >
+	  </target>
+	
+
+  <!-- =================================================================== -->
+  <!-- Prepares the docs                                                   -->
+  <!-- =================================================================== -->
+  <target name="docs" depends="prepare-src">
+    <mkdir dir="${build.docs}"/>
+    <javadoc 
+     	sourcepath="${build.src}"
+	destdir="${build.docs}" 
+    	packagenames="org.*"
+	author="true"
+	classpathref="pcp"
+	version="true"
+	use="true"
+	windowtitle="XML Pipe"
+	doctitle="XML Pipe"
+	bottom="Copyright &#169; 2003-2011 SoftTouch IT. All Rights Reserved."/>
+  </target>
+  
+  <target name="bootstrap" depends="clean, package, docs" >
+   <echo message="Building everything ... "/>
+  </target>
+  
+
+  <!-- =================================================================== -->
+  <!-- Clean targets                                                       -->
+  <!-- =================================================================== -->
+  <target name="clean" depends="init">
+    <delete dir="${build.dir}"/>
+    <delete dir="${build.dest}"/>
+  </target>
+
+  <target name="distclean" depends="clean">
+    <delete dir="${dist.dir}"/>
+  </target>
+
+</project>
